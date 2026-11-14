@@ -23,6 +23,8 @@ services:
       DB_URL: jdbc:postgresql://postgres:5432/banking
       BRANCH: ${BRANCH:-main}
       ACCESS_LOG: ${ACCESS_LOG:-true}
+      LIFO_ENABLED: ${LIFO_ENABLED:-true}
+      CODEL_ENABLED: ${CODEL_ENABLED:-true}
     ports:
       - "8080:8080"
     depends_on:

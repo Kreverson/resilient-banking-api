@@ -29,6 +29,15 @@ bank:
   # 20 threads processando, como no video.
   workers: 20
   client-timeout: 3s
+  # LIFO adaptativo: com mais de 20 pedidos na fila, atende o mais novo primeiro.
+  lifo:
+    enabled: ${LIFO_ENABLED:true}
+    threshold: 20
+  # CoDel do Facebook: limite de espera de 100ms, que cai para 5ms se a fila nao esvaziou nos ultimos 100ms.
+  codel:
+    enabled: ${CODEL_ENABLED:true}
+    interval: 100ms
+    target: 5ms
   access-log: ${ACCESS_LOG:true}
   # Custo simulado de cada etapa. Com a mistura 50/30/20 a capacidade fica perto de 350 pedidos/s.
   cost:
