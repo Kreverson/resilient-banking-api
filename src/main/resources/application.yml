@@ -28,6 +28,9 @@ server:
 bank:
   # 20 threads processando, como no video.
   workers: 20
+  # Load shedding: lugares na fila e o Retry-After devolvido na recusa.
+  queue-capacity: 100
+  retry-after: 1s
   client-timeout: 3s
   access-log: ${ACCESS_LOG:true}
   # Custo simulado de cada etapa. Com a mistura 50/30/20 a capacidade fica perto de 350 pedidos/s.
