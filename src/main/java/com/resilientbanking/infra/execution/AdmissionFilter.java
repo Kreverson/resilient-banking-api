@@ -5,6 +5,8 @@ import com.resilientbanking.infra.observability.AccessLog;
 import com.resilientbanking.infra.observability.Outcome;
 import com.resilientbanking.infra.observability.RequestTrace;
 import com.resilientbanking.infra.observability.ResilienceMetrics;
+import com.resilientbanking.infra.web.error.ErrorCode;
+import com.resilientbanking.infra.web.error.ProblemResponseWriter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -66,7 +68,27 @@ public class AdmissionFilter extends OncePerRequestFilter {
         CompletableFuture<Void> done = new CompletableFuture<>();
         pool.submit(new WorkItem(trace.priority(), trace.arrivalNanos(),
                 () -> process(trace, request, response, chain), done));
-        await(done);
+        try {
+            await(done);
+        } catch (RequestExpiredException e) {
+            expired(trace, response);
+        }
+    }
+
+    /** Ninguem esta esperando esta resposta; ela sai so para fechar a conexao e entrar nas metricas. */
+    private void expired(RequestTrace trace, HttpServletResponse response) throws IOException {
+        trace.finished(System.nanoTime(), ErrorCode.REQUEST_EXPIRED.status().value());
+        MDC.put("requestId", trace.requestId());
+        MDC.put("priority", trace.priority().tag());
+        try {
+            metrics.finished(trace, Outcome.DISCARDED);
+            accessLog.log(trace, Outcome.DISCARDED);
+            ProblemResponseWriter.write(response, ErrorCode.REQUEST_EXPIRED,
+                    "O pedido esperou mais que o limite do cliente e foi descartado sem processar",
+                    trace.path(), trace.requestId());
+        } finally {
+            MDC.clear();
+        }
     }
 
     private void process(RequestTrace trace, HttpServletRequest request, HttpServletResponse response,
@@ -96,6 +118,9 @@ public class AdmissionFilter extends OncePerRequestFilter {
         } catch (ExecutionException e) {
             Throwable cause = e.getCause() instanceof IllegalStateException ise && ise.getCause() != null
                     ? ise.getCause() : e.getCause();
+            if (cause instanceof RequestExpiredException expired) {
+                throw expired;
+            }
             if (cause instanceof IOException io) {
                 throw io;
             }
