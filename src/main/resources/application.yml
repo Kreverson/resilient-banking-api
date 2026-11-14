@@ -29,6 +29,13 @@ bank:
   # 20 threads processando, como no video.
   workers: 20
   client-timeout: 3s
+  # Degradacao graciosa: a cada 100ms, fila acima de 20 desce o dimmer rapido; abaixo de 5 sobe devagar.
+  brownout:
+    interval: 100ms
+    queue-high: 20
+    queue-low: 5
+    step-down: 0.1
+    step-up: 0.01
   access-log: ${ACCESS_LOG:true}
   # Custo simulado de cada etapa. Com a mistura 50/30/20 a capacidade fica perto de 350 pedidos/s.
   cost:
