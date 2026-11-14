@@ -35,6 +35,8 @@ footer() {
 
         location /v1/partners/ {
             proxy_pass http://${group};
+            # Sem isso o Host vira o nome do upstream (all_nodes, shard_1_2) e o Tomcat recusa o underscore com 400.
+            proxy_set_header Host \$host;
             # POST tambem e repetido no proximo no quando a conexao falha (o no caiu antes de responder).
             proxy_next_upstream error timeout http_502 http_503 non_idempotent;
             proxy_next_upstream_tries ${tries};
