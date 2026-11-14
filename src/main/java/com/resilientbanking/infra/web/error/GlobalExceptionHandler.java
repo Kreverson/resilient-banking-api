@@ -17,6 +17,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
@@ -72,6 +73,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     ResponseEntity<ProblemDetail> unreadable(HttpMessageNotReadableException ex) {
         return problem(ErrorCode.MALFORMED_REQUEST, "JSON invalido ou com campos de tipo errado");
+    }
+
+    /** O cliente desistiu e fechou a conexao antes da resposta: nao ha para quem responder. */
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    void clientGone(AsyncRequestNotUsableException ex) {
+        log.debug("Cliente fechou a conexao antes da resposta: {}", ex.getMessage());
     }
 
     @ExceptionHandler(Exception.class)
