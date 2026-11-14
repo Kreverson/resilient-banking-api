@@ -5,6 +5,8 @@ import com.resilientbanking.infra.observability.AccessLog;
 import com.resilientbanking.infra.observability.Outcome;
 import com.resilientbanking.infra.observability.RequestTrace;
 import com.resilientbanking.infra.observability.ResilienceMetrics;
+import com.resilientbanking.infra.web.error.ErrorCode;
+import com.resilientbanking.infra.web.error.ProblemResponseWriter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -12,6 +14,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.MDC;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -38,6 +41,7 @@ public class AdmissionFilter extends OncePerRequestFilter {
     private final ResilienceMetrics metrics;
     private final AccessLog accessLog;
     private final long clientTimeoutNanos;
+    private final String retryAfterSeconds;
 
     public AdmissionFilter(WorkerPool pool, PriorityClassifier classifier, ResilienceMetrics metrics,
                            AccessLog accessLog, BankProperties properties) {
@@ -46,6 +50,7 @@ public class AdmissionFilter extends OncePerRequestFilter {
         this.metrics = metrics;
         this.accessLog = accessLog;
         this.clientTimeoutNanos = properties.clientTimeout().toNanos();
+        this.retryAfterSeconds = String.valueOf(Math.max(1, properties.retryAfter().toSeconds()));
     }
 
     @Override
@@ -64,9 +69,33 @@ public class AdmissionFilter extends OncePerRequestFilter {
         metrics.received(trace.priority());
 
         CompletableFuture<Void> done = new CompletableFuture<>();
-        pool.submit(new WorkItem(trace.priority(), trace.arrivalNanos(),
+        boolean admitted = pool.submit(new WorkItem(trace.priority(), trace.arrivalNanos(),
                 () -> process(trace, request, response, chain), done));
+        if (!admitted) {
+            reject(trace, response);
+            return;
+        }
         await(done);
+    }
+
+    /**
+     * Recusa na porta: nao le o corpo, nao toca no banco e nao ocupa worker. Para uma transacao isso garante que
+     * nada foi lancado, entao o cliente pode tentar de novo com a mesma chave de idempotencia.
+     */
+    private void reject(RequestTrace trace, HttpServletResponse response) throws IOException {
+        trace.finished(System.nanoTime(), ErrorCode.SERVICE_OVERLOADED.status().value());
+        MDC.put("requestId", trace.requestId());
+        MDC.put("priority", trace.priority().tag());
+        try {
+            metrics.finished(trace, Outcome.REJECTED);
+            accessLog.log(trace, Outcome.REJECTED);
+            response.setHeader(HttpHeaders.RETRY_AFTER, retryAfterSeconds);
+            ProblemResponseWriter.write(response, ErrorCode.SERVICE_OVERLOADED,
+                    "Sem lugar na fila para prioridade " + trace.priority().tag() + "; tente novamente em "
+                            + retryAfterSeconds + "s", trace.path(), trace.requestId());
+        } finally {
+            MDC.clear();
+        }
     }
 
     private void process(RequestTrace trace, HttpServletRequest request, HttpServletResponse response,
