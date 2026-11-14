@@ -19,7 +19,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * A "cozinha": um numero fixo de threads que tiram pedidos de uma fila.
  *
- * Branch 04 (load shedding por prioridade): uma fila so, FIFO, com um limite diferente para cada prioridade.
+ * Branch 07 (combinada): load shedding por prioridade da branch 04 e, no extrato, o brownout da branch 05.
+ * Uma fila so, FIFO, com um limite diferente para cada prioridade.
  * O pre-carregamento so entra com a fila abaixo de 20, o extrato ate 100 e a transacao ate 150. Assim a recusa
  * comeca pelo que ninguem esta olhando e sempre sobra lugar para o pedido critico.
  */
@@ -49,6 +50,10 @@ public class WorkerPool {
             return false;
         }
         return queue.offerLast(item);
+    }
+
+    public int queueSize() {
+        return queue.size();
     }
 
     private void loop() {
