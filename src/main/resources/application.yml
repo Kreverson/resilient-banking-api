@@ -1,0 +1,59 @@
+spring:
+  application:
+    name: resilient-banking-api
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/banking}
+    username: ${DB_USER:banking}
+    password: ${DB_PASSWORD:banking}
+    hikari:
+      maximum-pool-size: 25
+      minimum-idle: 25
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+
+server:
+  port: 8080
+  tomcat:
+    # A porta precisa aceitar bem mais conexoes do que a cozinha processa para a fila existir.
+    max-connections: 10000
+    accept-count: 1000
+
+bank:
+  # 20 threads processando, como no video.
+  workers: 20
+  client-timeout: 3s
+  access-log: ${ACCESS_LOG:true}
+  # Custo simulado de cada etapa. Com a mistura 50/30/20 a capacidade fica perto de 350 pedidos/s.
+  cost:
+    FRAUD_CHECK: 45ms
+    STATEMENT: 25ms
+    INSIGHTS: 40ms
+    RECEIPTS: 50ms
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      branch: ${BRANCH:main}
+
+logging:
+  structured:
+    format:
+      console: ecs
+  level:
+    root: INFO
