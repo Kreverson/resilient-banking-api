@@ -7,6 +7,7 @@ import com.resilientbanking.domain.model.LedgerEntry;
 import com.resilientbanking.domain.model.Operation;
 import com.resilientbanking.domain.model.Statement;
 import com.resilientbanking.domain.port.AccountRepository;
+import com.resilientbanking.domain.port.OptionalContentPolicy;
 import com.resilientbanking.domain.port.ProcessingCost;
 import com.resilientbanking.domain.port.TransactionRepository;
 import com.resilientbanking.domain.service.InsightAdvisor;
@@ -22,13 +23,16 @@ public class GetStatementUseCase {
     private final TransactionRepository transactions;
     private final ProcessingCost processingCost;
     private final InsightAdvisor insightAdvisor;
+    private final OptionalContentPolicy optionalContent;
 
     public GetStatementUseCase(AccountRepository accounts, TransactionRepository transactions,
-                               ProcessingCost processingCost, InsightAdvisor insightAdvisor) {
+                               ProcessingCost processingCost, InsightAdvisor insightAdvisor,
+                               OptionalContentPolicy optionalContent) {
         this.accounts = accounts;
         this.transactions = transactions;
         this.processingCost = processingCost;
         this.insightAdvisor = insightAdvisor;
+        this.optionalContent = optionalContent;
     }
 
     public Statement execute(long accountId) {
@@ -37,7 +41,10 @@ public class GetStatementUseCase {
         List<LedgerEntry> entries = transactions.findRecentEntriesByAccount(accountId, STATEMENT_SIZE);
         processingCost.spend(Operation.STATEMENT);
 
-        // Parte cara e opcional da resposta: e ela que a degradacao graciosa desliga sob carga.
+        // Parte cara e opcional da resposta: sob carga ela e desligada e o extrato sai igual para todo mundo.
+        if (!optionalContent.serveOptionalContent()) {
+            return new Statement(account, entries, null);
+        }
         processingCost.spend(Operation.INSIGHTS);
         List<Insight> insights = insightAdvisor.advise(account, entries);
 

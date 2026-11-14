@@ -4,6 +4,7 @@ import com.resilientbanking.application.usecase.ExecuteTransactionUseCase;
 import com.resilientbanking.application.usecase.GetStatementUseCase;
 import com.resilientbanking.application.usecase.PrefetchReceiptsUseCase;
 import com.resilientbanking.domain.port.AccountRepository;
+import com.resilientbanking.domain.port.OptionalContentPolicy;
 import com.resilientbanking.domain.port.ProcessingCost;
 import com.resilientbanking.domain.port.TransactionRepository;
 import com.resilientbanking.domain.port.TransactionRunner;
@@ -23,8 +24,8 @@ public class UseCaseConfig {
 
     @Bean
     GetStatementUseCase getStatementUseCase(AccountRepository accounts, TransactionRepository transactions,
-                                            ProcessingCost cost) {
-        return new GetStatementUseCase(accounts, transactions, cost, new InsightAdvisor());
+                                            ProcessingCost cost, OptionalContentPolicy optionalContent) {
+        return new GetStatementUseCase(accounts, transactions, cost, new InsightAdvisor(), optionalContent);
     }
 
     @Bean
