@@ -11,6 +11,7 @@ public enum ErrorCode {
     IDEMPOTENCY_CONFLICT(HttpStatus.CONFLICT, "Conflito de idempotencia"),
     CONCURRENT_REQUEST(HttpStatus.CONFLICT, "Requisicao concorrente com a mesma chave"),
     SERVICE_OVERLOADED(HttpStatus.SERVICE_UNAVAILABLE, "Servico sobrecarregado"),
+    REQUEST_EXPIRED(HttpStatus.SERVICE_UNAVAILABLE, "Pedido expirado na fila"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Erro interno");
 
     private final HttpStatus status;
