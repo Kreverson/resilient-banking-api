@@ -1,5 +1,30 @@
 name: resilient-banking
 
+# Branch 06: 8 copias da API atras de um gateway nginx que decide para quais nos cada parceiro vai.
+# SHARDING escolhe a estrategia: random (sem isolamento), cells (4 celulas de 2) ou shuffle (par sorteado).
+x-node: &node
+  build: .
+  image: resilient-banking-api:${BRANCH:-06-shuffle-sharding}
+  # Sem restart: no que caiu fica fora ate o fim do teste, para contar quem ficou sem servidor.
+  restart: "no"
+  depends_on:
+    postgres:
+      condition: service_healthy
+  deploy:
+    resources:
+      limits:
+        cpus: "1"
+        memory: 400m
+
+x-node-env: &node-env
+  DB_URL: jdbc:postgresql://postgres:5432/banking
+  BRANCH: ${BRANCH:-06-shuffle-sharding}
+  ACCESS_LOG: ${ACCESS_LOG:-true}
+  SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: 4
+  SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: 1
+  # O bug do parser estoura a memoria; com esta flag a instancia inteira cai, como num crash de verdade.
+  JAVA_TOOL_OPTIONS: -XX:+ExitOnOutOfMemoryError
+
 services:
   postgres:
     image: postgres:17-alpine
@@ -16,23 +41,22 @@ services:
       timeout: 3s
       retries: 30
 
-  api:
-    build: .
-    image: resilient-banking-api:${BRANCH:-main}
-    environment:
-      DB_URL: jdbc:postgresql://postgres:5432/banking
-      BRANCH: ${BRANCH:-main}
-      ACCESS_LOG: ${ACCESS_LOG:-true}
+  node1: { <<: *node, environment: { <<: *node-env, NODE_ID: node1 } }
+  node2: { <<: *node, environment: { <<: *node-env, NODE_ID: node2 } }
+  node3: { <<: *node, environment: { <<: *node-env, NODE_ID: node3 } }
+  node4: { <<: *node, environment: { <<: *node-env, NODE_ID: node4 } }
+  node5: { <<: *node, environment: { <<: *node-env, NODE_ID: node5 } }
+  node6: { <<: *node, environment: { <<: *node-env, NODE_ID: node6 } }
+  node7: { <<: *node, environment: { <<: *node-env, NODE_ID: node7 } }
+  node8: { <<: *node, environment: { <<: *node-env, NODE_ID: node8 } }
+
+  gateway:
+    image: nginx:1.27-alpine
+    volumes:
+      - ./sharding/${SHARDING:-shuffle}.conf:/etc/nginx/nginx.conf:ro
     ports:
-      - "8080:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    deploy:
-      resources:
-        limits:
-          cpus: "4"
-          memory: 2g
+      - "8080:80"
+    depends_on: [node1, node2, node3, node4, node5, node6, node7, node8]
 
   prometheus:
     image: prom/prometheus:v3.5.0

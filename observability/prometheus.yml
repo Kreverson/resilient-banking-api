@@ -7,4 +7,5 @@ scrape_configs:
   - job_name: resilient-banking-api
     metrics_path: /actuator/prometheus
     static_configs:
-      - targets: ["api:8080"]
+      - targets: ["node1:8080", "node2:8080", "node3:8080", "node4:8080",
+                  "node5:8080", "node6:8080", "node7:8080", "node8:8080"]
