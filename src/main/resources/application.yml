@@ -36,6 +36,7 @@ bank:
     STATEMENT: 25ms
     INSIGHTS: 40ms
     RECEIPTS: 50ms
+    BATCH: 10ms
 
 management:
   endpoints:

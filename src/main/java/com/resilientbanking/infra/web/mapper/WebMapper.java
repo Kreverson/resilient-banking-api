@@ -2,9 +2,11 @@ package com.resilientbanking.infra.web.mapper;
 
 import com.resilientbanking.application.command.TransactionCommand;
 import com.resilientbanking.application.result.TransactionResult;
+import com.resilientbanking.domain.model.PaymentBatch;
 import com.resilientbanking.domain.model.Receipt;
 import com.resilientbanking.domain.model.Statement;
 import com.resilientbanking.domain.model.Transaction;
+import com.resilientbanking.infra.web.dto.BatchResponse;
 import com.resilientbanking.infra.web.dto.ReceiptResponse;
 import com.resilientbanking.infra.web.dto.StatementResponse;
 import com.resilientbanking.infra.web.dto.TransactionRequest;
@@ -39,6 +41,10 @@ public final class WebMapper {
                 .toList();
         return new StatementResponse(statement.account().id(), statement.account().holderName(),
                 statement.account().balance(), entries, insights, statement.degraded());
+    }
+
+    public static BatchResponse toResponse(PaymentBatch batch, String node) {
+        return new BatchResponse(batch.partnerId(), batch.lines().size(), batch.total(), node);
     }
 
     public static ReceiptResponse toResponse(Receipt receipt) {

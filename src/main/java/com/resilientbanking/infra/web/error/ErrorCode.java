@@ -6,6 +6,7 @@ public enum ErrorCode {
     VALIDATION_ERROR(HttpStatus.BAD_REQUEST, "Requisicao invalida"),
     MALFORMED_REQUEST(HttpStatus.BAD_REQUEST, "Corpo da requisicao ilegivel"),
     INVALID_TRANSACTION(HttpStatus.UNPROCESSABLE_CONTENT, "Transacao invalida"),
+    INVALID_BATCH(HttpStatus.UNPROCESSABLE_CONTENT, "Lote invalido"),
     INSUFFICIENT_FUNDS(HttpStatus.UNPROCESSABLE_CONTENT, "Saldo insuficiente"),
     ACCOUNT_NOT_FOUND(HttpStatus.NOT_FOUND, "Conta nao encontrada"),
     IDEMPOTENCY_CONFLICT(HttpStatus.CONFLICT, "Conflito de idempotencia"),

@@ -3,6 +3,7 @@ package com.resilientbanking.infra.web.error;
 import com.resilientbanking.domain.exception.AccountNotFoundException;
 import com.resilientbanking.domain.exception.IdempotencyConflictException;
 import com.resilientbanking.domain.exception.InsufficientFundsException;
+import com.resilientbanking.domain.exception.InvalidBatchException;
 import com.resilientbanking.domain.exception.InvalidTransactionException;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
@@ -43,6 +44,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidTransactionException.class)
     ResponseEntity<ProblemDetail> invalidTransaction(InvalidTransactionException ex) {
         return problem(ErrorCode.INVALID_TRANSACTION, ex.getMessage());
+    }
+
+    @ExceptionHandler(InvalidBatchException.class)
+    ResponseEntity<ProblemDetail> invalidBatch(InvalidBatchException ex) {
+        return problem(ErrorCode.INVALID_BATCH, ex.getMessage());
     }
 
     @ExceptionHandler(IdempotencyConflictException.class)
