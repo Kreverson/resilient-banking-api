@@ -32,7 +32,7 @@ services:
       resources:
         limits:
           cpus: "4"
-          memory: 1g
+          memory: 2g
 
   prometheus:
     image: prom/prometheus:v3.5.0
