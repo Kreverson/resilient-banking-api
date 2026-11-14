@@ -40,6 +40,10 @@ public class WorkerPool {
         queue.offerLast(item);
     }
 
+    public int queueSize() {
+        return queue.size();
+    }
+
     private void loop() {
         while (!Thread.currentThread().isInterrupted()) {
             WorkItem item;
