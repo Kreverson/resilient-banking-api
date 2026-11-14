@@ -5,5 +5,6 @@ public enum Operation {
     FRAUD_CHECK,
     STATEMENT,
     INSIGHTS,
-    RECEIPTS
+    RECEIPTS,
+    BATCH
 }
