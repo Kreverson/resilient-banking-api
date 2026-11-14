@@ -19,15 +19,14 @@ public class AccessLog {
         this.enabled = properties.accessLog();
     }
 
+    /** requestId e priority ja estao no MDC e saem em todas as linhas de log do pedido. */
     public void log(RequestTrace trace, Outcome outcome) {
         if (!enabled) {
             return;
         }
         log.atInfo()
-                .addKeyValue("requestId", trace.requestId())
                 .addKeyValue("method", trace.method())
                 .addKeyValue("path", trace.path())
-                .addKeyValue("priority", trace.priority().tag())
                 .addKeyValue("status", trace.status())
                 .addKeyValue("outcome", outcome.tag())
                 .addKeyValue("queueMs", millis(trace.queueNanos()))

@@ -21,7 +21,7 @@ import java.util.function.IntSupplier;
  *       outcome=on_time com status 2xx</li>
  *   <li>bank_queue_wait_seconds{priority}: tempo esperando uma worker</li>
  *   <li>bank_service_time_seconds{priority}: tempo ocupando uma worker</li>
- *   <li>bank_queue_size, bank_workers_busy, bank_workers_total: estado da cozinha</li>
+ *   <li>bank_queue_size, bank_workers_busy, bank_workers_capacity: estado da cozinha</li>
  *   <li>bank_brownout_dimmer: fracao de extratos que saem com insights (1 = sem degradacao)</li>
  *   <li>bank_statement_degraded_total: extratos que sairam sem insights</li>
  * </ul>
@@ -48,7 +48,7 @@ public class ResilienceMetrics {
     public void bindPool(IntSupplier queueSize, IntSupplier busyWorkers, int totalWorkers) {
         Gauge.builder("bank.queue.size", queueSize::getAsInt).register(registry);
         Gauge.builder("bank.workers.busy", busyWorkers::getAsInt).register(registry);
-        Gauge.builder("bank.workers.total", () -> totalWorkers).register(registry);
+        Gauge.builder("bank.workers.capacity", () -> totalWorkers).register(registry);
     }
 
     public void received(RequestPriority priority) {
