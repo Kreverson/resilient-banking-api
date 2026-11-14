@@ -16,8 +16,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * A "cozinha": um numero fixo de threads que tiram pedidos de uma fila.
  *
- * Na main a fila nao tem limite e anda por ordem de chegada (FIFO). Nao ha protecao nenhuma:
- * quando chega mais do que as workers dao conta, a fila cresce sem parar.
+ * Branch 03 (LIFO adaptativo + CoDel, como no Facebook):
+ * <ul>
+ *   <li>LIFO adaptativo: enquanto a fila esta pequena ela anda por ordem de chegada. Quando passa do limite,
+ *       a worker pega o pedido mais novo, que e o que ainda tem alguem esperando.</li>
+ *   <li>CoDel (controlled delay): se a fila nao ficou vazia nos ultimos 100ms, o sistema esta sobrecarregado e
+ *       o tempo maximo de espera cai de 100ms para 5ms. Quem esperou mais que isso e descartado sem processar.</li>
+ * </ul>
+ * A fila continua sem limite de tamanho.
  */
 @Component
 public class WorkerPool {
@@ -27,8 +33,13 @@ public class WorkerPool {
     private final BlockingDeque<WorkItem> queue = new LinkedBlockingDeque<>();
     private final AtomicInteger busy = new AtomicInteger();
     private final List<Thread> workers = new ArrayList<>();
+    private final BankProperties.Lifo lifo;
+    private final BankProperties.Codel codel;
+    private volatile long lastEmptyNanos = System.nanoTime();
 
     public WorkerPool(BankProperties properties, ResilienceMetrics metrics) {
+        this.lifo = properties.lifo();
+        this.codel = properties.codel();
         metrics.bindPool(queue::size, busy::get, properties.workers());
         for (int i = 1; i <= properties.workers(); i++) {
             Thread worker = Thread.ofPlatform().name("worker-" + i).daemon().start(this::loop);
@@ -44,9 +55,13 @@ public class WorkerPool {
         while (!Thread.currentThread().isInterrupted()) {
             WorkItem item;
             try {
-                item = queue.takeFirst();
+                item = take();
             } catch (InterruptedException e) {
                 return;
+            }
+            if (codel.enabled() && waited(item, System.nanoTime()) > codelLimit(System.nanoTime())) {
+                expire(item);
+                continue;
             }
             busy.incrementAndGet();
             try {
@@ -58,6 +73,43 @@ public class WorkerPool {
                 busy.decrementAndGet();
             }
         }
+    }
+
+    private WorkItem take() throws InterruptedException {
+        if (codel.enabled()) {
+            dropExpiredFromHead();
+        }
+        WorkItem item = lifo.enabled() && queue.size() > lifo.threshold() ? queue.takeLast() : queue.takeFirst();
+        if (queue.isEmpty()) {
+            lastEmptyNanos = System.nanoTime();
+        }
+        return item;
+    }
+
+    /** No LIFO os mais antigos ficam no inicio da fila; o CoDel os descarta de la sem esperar a vez deles. */
+    private void dropExpiredFromHead() {
+        long now = System.nanoTime();
+        long limit = codelLimit(now);
+        WorkItem head;
+        while ((head = queue.peekFirst()) != null && waited(head, now) > limit) {
+            WorkItem expired = queue.pollFirst();
+            if (expired != null) {
+                expire(expired);
+            }
+        }
+    }
+
+    private long codelLimit(long now) {
+        boolean overloaded = now - lastEmptyNanos > codel.interval().toNanos();
+        return overloaded ? codel.target().toNanos() : codel.interval().toNanos();
+    }
+
+    private static long waited(WorkItem item, long now) {
+        return now - item.arrivalNanos();
+    }
+
+    private static void expire(WorkItem item) {
+        item.done().completeExceptionally(new RequestExpiredException());
     }
 
     @PreDestroy
