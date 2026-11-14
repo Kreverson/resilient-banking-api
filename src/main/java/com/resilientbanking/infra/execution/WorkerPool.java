@@ -16,8 +16,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * A "cozinha": um numero fixo de threads que tiram pedidos de uma fila.
  *
- * Na main a fila nao tem limite e anda por ordem de chegada (FIFO). Nao ha protecao nenhuma:
- * quando chega mais do que as workers dao conta, a fila cresce sem parar.
+ * Branch 01 (descarte por deadline): a fila continua sem limite e FIFO, mas antes de comecar cada pedido a worker
+ * olha ha quanto tempo ele chegou. Se passou do tempo que o cliente espera, joga fora sem processar.
  */
 @Component
 public class WorkerPool {
@@ -27,8 +27,10 @@ public class WorkerPool {
     private final BlockingDeque<WorkItem> queue = new LinkedBlockingDeque<>();
     private final AtomicInteger busy = new AtomicInteger();
     private final List<Thread> workers = new ArrayList<>();
+    private final long deadlineNanos;
 
     public WorkerPool(BankProperties properties, ResilienceMetrics metrics) {
+        this.deadlineNanos = properties.clientTimeout().toNanos();
         metrics.bindPool(queue::size, busy::get, properties.workers());
         for (int i = 1; i <= properties.workers(); i++) {
             Thread worker = Thread.ofPlatform().name("worker-" + i).daemon().start(this::loop);
@@ -47,6 +49,12 @@ public class WorkerPool {
                 item = queue.takeFirst();
             } catch (InterruptedException e) {
                 return;
+            }
+            // O cliente ja desistiu: nenhum lancamento foi feito, entao descartar e seguro (o retry usa a mesma
+            // chave de idempotencia).
+            if (System.nanoTime() - item.arrivalNanos() > deadlineNanos) {
+                item.done().completeExceptionally(new RequestExpiredException());
+                continue;
             }
             busy.incrementAndGet();
             try {
